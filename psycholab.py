@@ -2,9 +2,9 @@ import csv
 from pathlib import Path
 from random import shuffle
 from audio import generate_sound, LOW_AUDIO, HIGH_AUDIO
-from psychopy import visual, core, event, constants
+from psychopy import visual, core, event, constants, parallel
 from itertools import zip_longest
-
+from eventsEnums import Events
 # Files path
 IMAGE_DIR = Path('.') / 'images'
 
@@ -13,6 +13,7 @@ class StimuliSequence:
     """
     Stimuli presentations are as accurate as core.Clock() is.
     """
+    PARALLEL_PORT = 0x0378
     # Time constants
     FIXATION_DURATION = 0.1
     AUDIO_INTERVAL = 0.1
@@ -30,6 +31,8 @@ class StimuliSequence:
     SPACE_KEY = "space"
     OUTPUT_FILENAME = "exampleOutput.csv"
     WRITE_OPEN_MODE = 'w'
+    DEFAULT_UNIT = "deg"
+    DEFAULT_MONITOR = "testMonitor"
 
     def __init__(self):
         """
@@ -37,8 +40,8 @@ class StimuliSequence:
         """
         self._main_window = visual.Window(
             fullscr=True,
-            monitor="testMonitor",
-            units="deg"
+            monitor=self.DEFAULT_MONITOR,
+            units=self.DEFAULT_UNIT
         )
 
         self._init_images()
@@ -51,10 +54,11 @@ class StimuliSequence:
         )
 
         self._global_clock = core.Clock()
-        self._timings = {"fixationStart": [], "fixationEnd": [],
-                         "imageStart": [], "imageEnd": [], "audioStart": [],
-                         "audioEnd": [], "keyPress": []}
-
+        self._timings = {Events.fixationStart: [], Events.fixationEnd: [],
+                         Events.imageStart: [], Events.imageEnd: [],
+                         Events.audioStart: [], Events.audioEnd: [],
+                         Events.keyPress: []}
+        # self._port = parallel.ParallelPort(address=self.PARALLEL_PORT)
         # Create list with audio objects and shuffle it
         audio_list = [
                          generate_sound(LOW_AUDIO, self.AUDIO_DURATION)
@@ -88,20 +92,21 @@ class StimuliSequence:
         """
         Called upon space key press event, records its timestamp
         """
-        self._timings["keyPress"].append(self._global_clock.getTime())
+        self._timings[Events.keyPress].append(self._global_clock.getTime())
 
     def _draw_fixation(self):
         """
         Draw the fixation point
         """
         clock = core.Clock()
-        self._timings["fixationStart"].append(self._global_clock.getTime())
+        self._timings[Events.fixationStart].append(
+            self._global_clock.getTime())
 
         while clock.getTime() < self.FIXATION_DURATION:
             self._fixation.draw()
             self._main_window.flip()
 
-        self._timings["fixationEnd"].append(self._global_clock.getTime())
+        self._timings[Events.fixationEnd].append(self._global_clock.getTime())
 
     def _draw_image(self, image):
         """
@@ -111,13 +116,13 @@ class StimuliSequence:
         clock = core.Clock()
         played_sound = False
         recorded_sound = False
-        self._timings["imageStart"].append(self._global_clock.getTime())
+        self._timings[Events.imageStart].append(self._global_clock.getTime())
         audio = None
         while clock.getTime() < self.IMAGE_DURATION:
             image.draw()
             self._main_window.flip()
             if clock.getTime() >= self.AUDIO_INTERVAL and not played_sound:
-                self._timings["audioStart"].append(
+                self._timings[Events.audioStart].append(
                     self._global_clock.getTime())
                 audio = next(self._audio_iter)
                 audio.play()
@@ -126,10 +131,10 @@ class StimuliSequence:
             # Append audio end timestamp
             if played_sound and not recorded_sound and audio.status == \
                     constants.FINISHED:
-                self._timings["audioEnd"].append(self._global_clock.getTime())
+                self._timings[Events.audioEnd].append(self._global_clock.getTime())
                 recorded_sound = True
 
-        self._timings["imageEnd"].append(self._global_clock.getTime())
+        self._timings[Events.imageEnd].append(self._global_clock.getTime())
 
     def _run_sequence(self, image):
         """
@@ -156,7 +161,10 @@ class StimuliSequence:
             with open(self.OUTPUT_FILENAME, self.WRITE_OPEN_MODE,
                       newline='') as outfile:
                 writer = csv.writer(outfile)
-                writer.writerow(self._timings.keys())
+                # keys without the enum name
+                keys = [str(key)[str(key).index('.') + 1:] for key in
+                        self._timings.keys()]
+                writer.writerow(keys)
 
                 for values in zip_longest(*self._timings.values()):
                     writer.writerow(values)
