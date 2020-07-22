@@ -1,38 +1,16 @@
 import csv
-from pathlib import Path
 from random import shuffle
 from audio import generate_sound, LOW_AUDIO, HIGH_AUDIO
-from psychopy import visual, core, event, constants, parallel
+from psychopy import visual, core, event, constants
+# from psychopy import parallel
 from itertools import zip_longest
-from eventsEnums import Events
-# Files path
-IMAGE_DIR = Path('.') / 'images'
+from config import *
 
 
 class StimuliSequence:
     """
     Stimuli presentations are as accurate as core.Clock() is.
     """
-    PARALLEL_PORT = 0x0378
-    # Time constants
-    FIXATION_DURATION = 0.1
-    AUDIO_INTERVAL = 0.1
-    AUDIO_DURATION = 0.2
-    # Number of times each audio should be played
-    LOW_AUDIO_COUNT = 15
-    HIGH_AUDIO_COUNT = 5
-    IMAGE_DURATION = 0.4
-    IMAGE_SIZE = (20, 15)
-    IMAGE_SUFFIX = '*.jpg'
-    # Fixation symbol and properties
-    FIXATION_SYMBOL = '+'
-    FIXATION_SIZE = 3
-    FIXATION_POSITION = [0, 0]
-    SPACE_KEY = "space"
-    OUTPUT_FILENAME = "exampleOutput.csv"
-    WRITE_OPEN_MODE = 'w'
-    DEFAULT_UNIT = "deg"
-    DEFAULT_MONITOR = "testMonitor"
 
     def __init__(self):
         """
@@ -40,17 +18,17 @@ class StimuliSequence:
         """
         self._main_window = visual.Window(
             fullscr=True,
-            monitor=self.DEFAULT_MONITOR,
-            units=self.DEFAULT_UNIT
+            monitor=DEFAULT_MONITOR,
+            units=DEFAULT_UNIT
         )
 
         self._init_images()
         # Fixation '+' stimuli
         self._fixation = visual.TextStim(
-            win=self._main_window, text=self.FIXATION_SYMBOL,
-            pos=self.FIXATION_POSITION,
+            win=self._main_window, text=FIXATION_SYMBOL,
+            pos=FIXATION_POSITION,
             bold=True,
-            height=self.FIXATION_SIZE
+            height=FIXATION_SIZE
         )
 
         self._global_clock = core.Clock()
@@ -61,22 +39,22 @@ class StimuliSequence:
         # self._port = parallel.ParallelPort(address=self.PARALLEL_PORT)
         # Create list with audio objects and shuffle it
         audio_list = [
-                         generate_sound(LOW_AUDIO, self.AUDIO_DURATION)
-                     ] * self.LOW_AUDIO_COUNT
-        audio_list += [generate_sound(HIGH_AUDIO, self.AUDIO_DURATION)
-                       ] * self.HIGH_AUDIO_COUNT
+                         generate_sound(LOW_AUDIO, AUDIO_DURATION)
+                     ] * LOW_AUDIO_COUNT
+        audio_list += [generate_sound(HIGH_AUDIO, AUDIO_DURATION)
+                       ] * HIGH_AUDIO_COUNT
         shuffle(audio_list)
         self._audio_iter = iter(audio_list)
 
         event.globalKeys.clear()
-        event.globalKeys.add(key=self.SPACE_KEY, func=self._space_press)
+        event.globalKeys.add(key=SPACE_KEY, func=self._space_press)
 
     def _init_images(self):
         """
         Initialize all image stimuli objects
         """
         # Load files
-        files = IMAGE_DIR.rglob(self.IMAGE_SUFFIX)
+        files = IMAGE_DIR.rglob(IMAGE_SUFFIX)
         images = [str(image_name) for image_name in files]
         shuffle(images)
 
@@ -84,7 +62,7 @@ class StimuliSequence:
         self._image_stimuli = [visual.ImageStim(
             win=self._main_window,
             image=image,
-            size=self.IMAGE_SIZE
+            size=IMAGE_SIZE
         )
             for image in images]
 
@@ -102,7 +80,7 @@ class StimuliSequence:
         self._timings[Events.fixationStart].append(
             self._global_clock.getTime())
 
-        while clock.getTime() < self.FIXATION_DURATION:
+        while clock.getTime() < FIXATION_DURATION:
             self._fixation.draw()
             self._main_window.flip()
 
@@ -118,10 +96,10 @@ class StimuliSequence:
         recorded_sound = False
         self._timings[Events.imageStart].append(self._global_clock.getTime())
         audio = None
-        while clock.getTime() < self.IMAGE_DURATION:
+        while clock.getTime() < IMAGE_DURATION:
             image.draw()
             self._main_window.flip()
-            if clock.getTime() >= self.AUDIO_INTERVAL and not played_sound:
+            if clock.getTime() >= AUDIO_INTERVAL and not played_sound:
                 self._timings[Events.audioStart].append(
                     self._global_clock.getTime())
                 audio = next(self._audio_iter)
@@ -151,25 +129,25 @@ class StimuliSequence:
         self._global_clock.reset()
         for image in self._image_stimuli:
             self._run_sequence(image)
-        event.globalKeys.remove(key=self.SPACE_KEY)
+        event.globalKeys.remove(key=SPACE_KEY)
 
     def save_into_file(self):
         """
         Saves timings into a csv file
         """
         try:
-            with open(self.OUTPUT_FILENAME, self.WRITE_OPEN_MODE,
+            with open(OUTPUT_FILENAME, WRITE_OPEN_MODE,
                       newline='') as outfile:
                 writer = csv.writer(outfile)
                 # keys without the enum name
-                keys = [str(key)[str(key).index('.') + 1:] for key in
-                        self._timings.keys()]
+                keys = [key.name for key in self._timings.keys()]
                 writer.writerow(keys)
 
                 for values in zip_longest(*self._timings.values()):
                     writer.writerow(values)
         except IOError:
-            exit()
+            print(ERROR_EXIT_CODE)
+            exit(ERROR_EXIT_CODE)
 
 
 if __name__ == "__main__":
