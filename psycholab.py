@@ -145,13 +145,21 @@ class StimuliSequence:
 
                 for values in zip_longest(*self._timings.values()):
                     writer.writerow(values)
+
         except IOError:
             print(ERROR_EXIT_CODE)
             exit(ERROR_EXIT_CODE)
+
+    def end_process(self):
+        """
+        Called in the end. Terminates everything.
+        """
+        self._main_window.close()
+        core.quit()
 
 
 if __name__ == "__main__":
     lab_program = StimuliSequence()
     lab_program.run()
     lab_program.save_into_file()
-    core.quit()
+    lab_program.end_process()
